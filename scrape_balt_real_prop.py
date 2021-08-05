@@ -18,6 +18,20 @@ def startForm(browser):
     form.choose_submit('ctl00$ctl00$rootMasterContent$LocalContentPlaceHolder$btnSearch')
     return browser, form
 
+def parseOwnerDetails(row):
+    
+    if 'LLC' or 'INC.' in row: 
+        # LLC. get full name
+        org_name = regex.findall('^(.+?),', row)
+
+
+    else:
+        owner_last_name = regex.findall('^(.+)?,', row)
+               
+        
+    owner_first_name = owner_data.Owner.apply(lambda row: regex.findall(',\s([A-Za-z\s]+)', row)[0])
+    owner_street_address = owner_data.Owner.apply(lambda row: regex.findall('([0-9A-Z]+)', row)[0])
+
 def retrieveOwnerData(html):
     # given html string, parse table and return these variables:
     # block, lot, property_address, owner, owner_street_address, owner_city, owner_state, owner_zip
@@ -40,9 +54,27 @@ def retrieveOwnerData(html):
         table = soup.find("table", {"class": "dataTable"})
         owner_data = pd.read_html(str(table), header=0)[0]
 
-        owner_last_name = owner_data.Owner.apply(lambda row: regex.findall('^(.+?),', row)[0])
-        owner_first_name = owner_data.Owner.apply(lambda row: regex.findall(',\s([A-Za-z\s]+)', row)[0])
-        owner_street_address = owner_data.Owner.apply(lambda row: regex.findall('([0-9A-Z]+)', row)[0])
+    owner1 = soup.find("span", {"id": "ctl00_ctl00_rootMasterContent_LocalContentPlaceHolder_DataGrid1_ctl02_lblOwner1"}).text.strip()
+    owner2 = soup.find("span", {"id": "ctl00_ctl00_rootMasterContent_LocalContentPlaceHolder_DataGrid1_ctl02_lblOwner2"}).text.strip()
+    owner3 = soup.find("span", {"id": "ctl00_ctl00_rootMasterContent_LocalContentPlaceHolder_DataGrid1_ctl02_lblOwner3"}).text.strip()
+    owner4 = soup.find("span", {"id": "ctl00_ctl00_rootMasterContent_LocalContentPlaceHolder_DataGrid1_ctl02_lblOwner4"}).text.strip()
+
+    # pattern for identifying if multiple owners exist:
+    if owner4 == '':
+        # one owner
+        owner1_name = owner1 
+        owner2_name = ""
+        owner_street_address = owner2
+        owner_city_state = owner3
+    else:
+        owner1_name = owner1 
+        owner2_name = owner2
+        owner_street_address = owner3
+        owner_city_state = owner4
+
+    # pattern for identifying is 
+        is_corporation = 
+
 
     return num_records
     # soup.select_one("ctl00_ctl00_rootMasterContent_LocalContentPlaceHolder_lblStatus").text)
