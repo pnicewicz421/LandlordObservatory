@@ -4,37 +4,28 @@ import pandas as pd
 import numpy as np
 from bs4 import BeautifulSoup
 import mechanicalsoup
+import xml
 import re, regex
+
+global browser, form
 
 def import_dhcd_data():
     # get dhcd file
     return pd.read_csv("violations_with_block_lot.csv")
 
-def startForm(browser):
+def startForm():
+    global browser, form
     # start page
     browser.open("https://cityservices.baltimorecity.gov/realproperty/default.aspx")    
     # select form
     form = browser.select_form('form[id="aspnetForm"]')
     form.choose_submit('ctl00$ctl00$rootMasterContent$LocalContentPlaceHolder$btnSearch')
-    return browser, form
-
-def parseOwnerDetails(row):
-    
-    if 'LLC' or 'INC.' in row: 
-        # LLC. get full name
-        org_name = regex.findall('^(.+?),', row)
 
 
-    else:
-        owner_last_name = regex.findall('^(.+)?,', row)
-               
-        
-    owner_first_name = owner_data.Owner.apply(lambda row: regex.findall(',\s([A-Za-z\s]+)', row)[0])
-    owner_street_address = owner_data.Owner.apply(lambda row: regex.findall('([0-9A-Z]+)', row)[0])
-
-def retrieveOwnerData(html):
+def retrieveOwnerData():
     # given html string, parse table and return these variables:
     # block, lot, property_address, owner, owner_street_address, owner_city, owner_state, owner_zip
+    global browser, form
     response = browser.submit_selected()
     html = response.text
 
@@ -72,58 +63,56 @@ def retrieveOwnerData(html):
         owner_street_address = owner3
         owner_city_state = owner4
 
-    # pattern for identifying is 
-        is_corporation = 
+    # pattern for identifying whether owner is a corporation 
+    corporation1 = regex.findall('((?:LIMITED)?\s?(?:PARTNERSHIP)?)$|(LL(?:L)?(C|P)(?:\.)?$|INC(?:\.)?(?:ORPORATED)?(?:,)?(?:\s+THE)?)$|(TRUST)$|(REALTY)$|(CORP(?:\.)?(?:,)?(?:ORATION)?(?:.)?(?:\s+THE)?)$', owner1_name)
+    corporation2 = regex.findall('((?:LIMITED)?\s?(?:PARTNERSHIP)?)$|(LL(?:L)?(C|P)(?:\.)?$|INC(?:\.)?(?:ORPORATED)?(?:,)?(?:\s+THE)?)$|(TRUST)$|(REALTY)$|(CORP(?:\.)?(?:,)?(?:ORATION)?(?:.)?(?:\s+THE)?)$', owner2_name)
+    
+    print(corporation1) 
+    print(corporation2)   
+    
+    if len(corporation1) > 0:
+        is_corporation1 = True
+    else:
+        is_corporation1 = False
+        
 
+    if len(corporation2) > 0:
+        is_corporation2 = True
+    else:
+        is_corporation2 = False
 
-    return num_records
+    return [owner1_name, owner2_name, owner_street_address, owner_city_state, is_corporation1, is_corporation2]
     # soup.select_one("ctl00_ctl00_rootMasterContent_LocalContentPlaceHolder_lblStatus").text)
 
     #"ctl00_ctl00_rootMasterContent_LocalContentPlaceHolder_lblStatus"
 
-def retrieveOwner(browser):
 
-
-    # find number of records first
-    result = re.sub("[^0-9]", "", str(retrieveOwnerData(response.text)))
-    print(address, fiscal_year, result)
-
-
-def findOwner(block, lot, address, fiscal_year, browser):
-    global available_fiscal_years
+def findOwner(block, lot, address, fiscal_year):
+    global available_fiscal_years, browser, form
 
     # select year - if available fiscal yeaar
     if str(fiscal_year) not in available_fiscal_years:
-        print("bad fiscal year")
-        return ""
+        return [None]*6
 
     form.set_select({"ctl00$ctl00$rootMasterContent$LocalContentPlaceHolder$ddYears": fiscal_year})
-
     # try block/lot first. if empty, try address
     if block is not np.nan and lot is not np.nan:
         form["ctl00$ctl00$rootMasterContent$LocalContentPlaceHolder$txtBlock"] = block
         form["ctl00$ctl00$rootMasterContent$LocalContentPlaceHolder$txtLot"] = lot
-        response = retrieveOwner(browser)
-        
-        
-
-
-
-    form["ctl00$ctl00$rootMasterContent$LocalContentPlaceHolder$txtAddress"] = address
-    response = browser.submit_selected()
-
-
-
+        result = retrieveOwnerData()
+    else:
+        form["ctl00$ctl00$rootMasterContent$LocalContentPlaceHolder$txtAddress"] = address
+    #result = browser.submit_selected()
 
     #block, lot, property_address, owner, owner_street_address, owner_city, owner_state, owner_zip = retrieveOwnerData(response.text)
 
-    browser, form = startForm(browser)
+    startForm()
     
     return result
 
 data = import_dhcd_data()
 browser = mechanicalsoup.StatefulBrowser()
-browser, form = startForm(browser)
+startForm()
 
 # convert notice date to datetime
 data['Date Notice'] = pd.to_datetime(data['Date Notice'])
@@ -149,4 +138,13 @@ for o in options:
 available_fiscal_years.pop()
 
 # apply FindOwner function to each row
-data['num_records'] = data.apply(lambda row: findOwner(row['Block'], row['Lot'], row['Address'], row['Fiscal Year'], browser), axis=1)
+data[['owner1_name', 'owner2_name', 'owner_street_addrress', 'owner_city_state', 'is_corporation1', 'is_corporation2']] = data.apply(lambda row: findOwner(row['Block'], row['Lot'], row['Address'], row['Fiscal Year']), axis=1, result_type='reduce')
+data = data.apply(lambda row: findOwner(row['Block'], row['Lot'], row['Address'], row['Fiscal Year']), axis=1, result_type='expand')
+
+
+### dev prep for owner functions
+i = 2
+block=data.iloc[i,-3]
+lot=data.iloc[i,-2]
+address=data.iloc[i,0]
+fiscal_year=data.iloc[i,-1]
