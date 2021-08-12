@@ -89,7 +89,8 @@ def readViolationData(url):
     output = parsePDF(url)
     
     #print (output)
-
+    
+    # get block and lot 
     block_regex = r"(?<=Block:)([A-Z0-9]+)\s*(?=Lot:)"
     lot_regex = r"(?<=Lot:)([0-9]{3})"
     block = regex.findall(block_regex, output)
@@ -102,6 +103,8 @@ def readViolationData(url):
         lot = ""
     else:
         lot = lot[0]
+
+
     return block, lot
 
 
